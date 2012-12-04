@@ -6,7 +6,6 @@ import java.util.concurrent.Executors
 
 import org.apache.commons.lang.StringUtils
 
-
 class GoodShowController {
 
 	def MAX_THREADS = 10
