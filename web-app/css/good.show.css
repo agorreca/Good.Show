@@ -1,0 +1,45 @@
+body {
+	background:#333;
+	font-family:Georgia;
+}
+h1 {
+	color:#eee
+}
+.green {
+	background:#cfc
+}
+.yellow {
+	background:#ffc
+}
+.red {
+	background:#fcc
+}
+#summary {
+	position:absolute;
+	-webkit-box-shadow:0 0 15px #fff;
+	-moz-box-shadow: 0 0 15px #fff;
+	box-shadow:0 0 15px #fff;
+	color:#333;
+	background:#fff;
+	right:.5em;
+	top:.5em;
+	list-style:none;
+	padding:0;
+	border:#fff 1px solid;
+	font-family:"Lucida Console", Monaco, monospace;
+	font-size:.8em;
+	font-weight:bold;
+}
+
+#summary li {
+	padding:.4em 1em;
+}
+.dark.green {
+	background:#cfc
+}
+.dark.yellow {
+	background:#ffc
+}
+.dark.red {
+	background:#fcc
+}
