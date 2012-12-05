@@ -1,8 +1,8 @@
 package good.show
 
+import groovyx.gpars.GParsPool
+
 import java.text.SimpleDateFormat
-import java.util.concurrent.ExecutorCompletionService
-import java.util.concurrent.Executors
 
 import org.apache.commons.lang.StringUtils
 
@@ -10,7 +10,9 @@ class GoodShowController {
 
 	def MAX_THREADS = 10
 	def THRESHOLD = 1
-	def grailsApplication, positives, negatives, model
+	static grailsApplication, model = []
+	static positives, negatives
+
 	def rss = [
 		[feed: 'Infobae', url:'http://www.infobae.com/rss/hoy.xml'],
 		[feed: 'La Nación', url:'http://contenidos.lanacion.com.ar/herramientas/rss/origen=2'],
@@ -32,21 +34,9 @@ class GoodShowController {
 			grailsAttributes.getApplicationContext().getResource(delegate).getFile().getText().split(/\s\s/)
 		}
 
-		model = []
-
 		positives = grailsApplication.config.dictionary.positives.path.fileAsArray()
 		negatives = grailsApplication.config.dictionary.negatives.path.fileAsArray()
-
-		def pool = Executors.newFixedThreadPool(MAX_THREADS)
-		def ecs = new ExecutorCompletionService<Void>(pool);
-
-		rss.each {
-			ecs.submit(new fetch(it), Void)
-		}
-		rss.each {
-			ecs.take().get()
-		}
-		pool.shutdown()
+		GParsPool.withPool { rss.eachParallel { fetch(it) } }
 
 		def news = [positives:[], neutral:[], negatives:[]]
 		model.each {
@@ -63,52 +53,46 @@ class GoodShowController {
 		render(template:'news', model:[news:news])
 	}
 
-	class fetch implements Runnable {
-		LinkedHashMap rss
-		fetch(LinkedHashMap newRss) {
-			this.rss = newRss
-		}
-		public void run() {
-			println "Fetching ${rss.feed}: ${rss.url} ..."
-			def feedName = rss.feed
-			def feeds = new XmlSlurper().parse(rss.url)
-			feeds.channel.childNodes().each {
-				if (it.name() == 'item') {
-					def item = [:]
-					it.childNodes().each {
-						if (it.name() in ['title', 'description', 'link', 'pubDate'] && !StringUtils.isBlank(it.text())) {
-							if (it.name() == 'title') {
-								item.title = it.text()
-							} else if(it.name() == 'description') {
-								item.description = it.text().replaceAll(/<.*>/, '')
-							} else if(it.name() == 'link') {
-								item.link = it.text()
-							} else if(it.name() == 'pubDate') {
-								item.pubDate = it.text()
-							}
+	private static fetch(LinkedHashMap rss) {
+		println "Fetching ${rss.feed}: ${rss.url} ..."
+		def feedName = rss.feed
+		def feeds = new XmlSlurper().parse(rss.url)
+		feeds.channel.childNodes().each {
+			if (it.name() == 'item') {
+				def item = [:]
+				it.childNodes().each {
+					if (it.name() in ['title', 'description', 'link', 'pubDate'] && !StringUtils.isBlank(it.text())) {
+						if (it.name() == 'title') {
+							item.title = it.text()
+						} else if(it.name() == 'description') {
+							item.description = it.text().replaceAll(/<.*>/, '')
+						} else if(it.name() == 'link') {
+							item.link = it.text()
+						} else if(it.name() == 'pubDate') {
+							item.pubDate = it.text()
 						}
 					}
-					item.words = [] as Set
-					item.weight = 0
-					item.feed = feedName
-					def pattern = ~/(\s*[a-zA-ZÃ¡Ã�Ã©Ã‰Ã­Ã�Ã³Ã“ÃºÃšÃ¤Ã„Ã«Ã‰Ã¯Ã�Ã¶Ã–Ã¼ÃœÃ Ã€Ã¨ÃˆÃ¬ÃŒÃ²Ã’Ã¹Ã™Ã±Ã‘Ã§Ã¦Ã‡Ã†Ã£ÃƒÃ•Ãµ][a-zA-ZÃ¡Ã�Ã©Ã‰Ã­Ã�Ã³Ã“ÃºÃšÃ¤Ã„Ã«Ã‰Ã¯Ã�Ã¶Ã–Ã¼ÃœÃ Ã€Ã¨ÃˆÃ¬ÃŒÃ²Ã’Ã¹Ã™Ã±Ã‘Ã§Ã¦Ã‡Ã†Ã£ÃƒÃ•Ãµ_1234567890]*\s*)/
-					def matcher = pattern.matcher((item.title?:'').concat(' ').concat(item.description?:''))
-					for(i in 0..<matcher.getCount()) {
-						String word = (matcher[i][0]).trim().toLowerCase()
-						item.words.add(word)
-						positives.each {
-							if (StringUtils.startsWith(word, it.trim())) {
-								item.weight++
-							}
-						}
-						negatives.each {
-							if (StringUtils.startsWith(word, it.trim())) {
-								item.weight--
-							}
-						}
-					}
-					model.add(item)
 				}
+				item.words = [] as Set
+				item.weight = 0
+				item.feed = feedName
+				def pattern = ~/(\s*[a-zA-ZÃ¡Ã�Ã©Ã‰Ã­Ã�Ã³Ã“ÃºÃšÃ¤Ã„Ã«Ã‰Ã¯Ã�Ã¶Ã–Ã¼ÃœÃ Ã€Ã¨ÃˆÃ¬ÃŒÃ²Ã’Ã¹Ã™Ã±Ã‘Ã§Ã¦Ã‡Ã†Ã£ÃƒÃ•Ãµ][a-zA-ZÃ¡Ã�Ã©Ã‰Ã­Ã�Ã³Ã“ÃºÃšÃ¤Ã„Ã«Ã‰Ã¯Ã�Ã¶Ã–Ã¼ÃœÃ Ã€Ã¨ÃˆÃ¬ÃŒÃ²Ã’Ã¹Ã™Ã±Ã‘Ã§Ã¦Ã‡Ã†Ã£ÃƒÃ•Ãµ_1234567890]*\s*)/
+				def matcher = pattern.matcher((item.title?:'').concat(' ').concat(item.description?:''))
+				for(i in 0..<matcher.getCount()) {
+					String word = (matcher[i][0]).trim().toLowerCase()
+					item.words.add(word)
+					positives.each {
+						if (StringUtils.startsWith(word, it.trim())) {
+							item.weight++
+						}
+					}
+					negatives.each {
+						if (StringUtils.startsWith(word, it.trim())) {
+							item.weight--
+						}
+					}
+				}
+				model.add(item)
 			}
 		}
 	}

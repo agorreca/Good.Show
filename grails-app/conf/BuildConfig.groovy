@@ -51,6 +51,7 @@ grails.project.dependency.resolution = {
 
         runtime ":database-migration:1.1"
 
+		compile ":gpars:0.3"
         compile ':cache:1.0.0'
     }
 }
